@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colder</title>
+
+  <!-- Tailwind CDN (Play CDN with dark mode class support) -->
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = { darkMode: 'class' };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- CodeMirror 5 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/shell/shell.min.js"></script>
+
+  <style>
+    /* ── CodeMirror sizing ── */
+    #cm-host .CodeMirror {
+      height: 100%;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Light theme for CodeMirror ── */
+    html:not(.dark) #cm-host .CodeMirror { background: #ffffff; color: #383a42; }
+    html:not(.dark) #cm-host .CodeMirror-gutters { background: #f8f8f8; border-right: 1px solid #e2e2e2; }
+    html:not(.dark) #cm-host .CodeMirror-linenumber { color: #9d9d9d; }
+
+    /* ── Scrollbars ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+    html:not(.dark) ::-webkit-scrollbar-thumb { background: #d4d4d8; }
+
+    /* ── Toast animations ── */
+    @keyframes slideUp   { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes slideDown { from { transform: translateY(0); opacity: 1; } to { transform: translateY(16px); opacity: 0; } }
+    .toast-in  { animation: slideUp   0.25s ease-out; }
+    .toast-out { animation: slideDown 0.25s ease-in forwards; }
+
+    /* ── Skeleton shimmer ── */
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position:  400px 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #27272a 25%, #3f3f46 50%, #27272a 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    html:not(.dark) .skeleton {
+      background: linear-gradient(90deg, #e4e4e7 25%, #f4f4f5 50%, #e4e4e7 75%);
+      background-size: 400px 100%;
+    }
+
+    /* ── Status dot pulse ── */
+    @keyframes dotPulse { 0%,100% { opacity:1; } 50% { opacity:.25; } }
+    .pulse { animation: dotPulse 1.4s ease-in-out infinite; }
+
+    /* ── Version item fade-in ── */
+    @keyframes fadeSlide { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+    .v-enter { animation: fadeSlide 0.25s ease-out both; }
+
+    /* ── Editable title ── */
+    [contenteditable]:focus { outline: none; border-bottom: 2px solid #6366f1; }
+
+    /* ── Tooltip ── */
+    [data-tip] { position: relative; }
+    [data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      background: #18181b; color: #e4e4e7; font-size: 11px; white-space: nowrap;
+      padding: 3px 8px; border-radius: 4px; pointer-events: none; z-index: 99;
+    }
+    /* Tooltip abaixo do elemento (para botões no topo da página) */
+    [data-tip].tip-bottom:hover::after {
+      bottom: auto;
+      top: calc(100% + 6px);
+    }
+    /* Tooltip à esquerda do elemento (para botões na borda direita) */
+    [data-tip].tip-left:hover::after {
+      bottom: auto;
+      top: 50%;
+      left: auto;
+      right: calc(100% + 8px);
+      transform: translateY(-50%);
+    }
+  </style>
+</head>
+
+<body class="bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 h-screen overflow-hidden select-none">
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYOUT: sidebar | editor | versions
+═══════════════════════════════════════════════════════════ -->
+<div class="flex h-screen overflow-hidden">
+
+  <!-- ─── SIDEBAR ─────────────────────────────────────────── -->
+  <aside id="sidebar"
+    class="w-64 flex-shrink-0 flex flex-col bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 transition-all duration-300">
+
+    <!-- Logo -->
+    <div class="px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+        </svg>
+      </div>
+      <span class="font-bold text-base tracking-tight text-zinc-900 dark:text-white">Colder</span>
+    </div>
+
+    <!-- New doc button -->
+    <div class="px-3 py-2.5 border-b border-zinc-200 dark:border-zinc-800">
+      <button onclick="showNewDocModal()"
+        class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        Novo documento
+      </button>
+    </div>
+
+    <!-- Search -->
+    <div class="px-3 py-2.5 border-b border-zinc-200 dark:border-zinc-800">
+      <div class="relative">
+        <svg class="absolute left-2.5 top-2.5 w-4 h-4 text-zinc-400 dark:text-zinc-500 pointer-events-none"
+          fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+        </svg>
+        <input id="search-input" type="text" placeholder="Buscar…"
+          oninput="handleSearch(this.value)"
+          class="w-full pl-8 pr-3 py-2 rounded-lg text-sm bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors" />
+      </div>
+    </div>
+
+    <!-- Document list -->
+    <div class="flex-1 overflow-y-auto py-2 px-2">
+      <div id="doc-skeleton" class="space-y-2 px-1">
+        <div class="skeleton h-12 rounded-lg"></div>
+        <div class="skeleton h-12 rounded-lg"></div>
+        <div class="skeleton h-12 rounded-lg"></div>
+      </div>
+      <div id="doc-list" class="hidden space-y-0.5"></div>
+      <p id="doc-empty" class="hidden text-center text-zinc-400 dark:text-zinc-600 text-sm py-10 px-3">Nenhum documento encontrado</p>
+    </div>
+
+    <!-- Footer: dark mode toggle + logout -->
+    <div class="px-4 py-2.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+      <a href="/logout" data-tip="Sair"
+        class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+      </a>
+      <button id="btn-darkmode" onclick="toggleDarkMode()" data-tip="Alternar tema"
+        class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+        <svg id="icon-sun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <svg id="icon-moon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+        </svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── MAIN EDITOR ──────────────────────────────────────── -->
+  <main class="flex-1 flex flex-col overflow-hidden bg-zinc-50 dark:bg-zinc-900">
+
+    <!-- Toolbar -->
+    <div id="toolbar" class="flex-shrink-0 flex items-center gap-3 px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+      <!-- Editable title -->
+      <h1 id="doc-title"
+        contenteditable="false"
+        onblur="onTitleBlur()"
+        onkeydown="onTitleKeydown(event)"
+        onclick="enableTitleEdit()"
+        class="flex-1 min-w-0 text-lg font-semibold truncate text-zinc-500 dark:text-zinc-500 cursor-default transition-colors outline-none">
+        Selecione um documento
+      </h1>
+
+      <!-- Language badge + dropdown -->
+      <div class="relative flex-shrink-0" id="lang-wrap">
+        <button id="lang-btn" onclick="toggleLangMenu()" disabled
+          class="flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 text-xs font-mono disabled:opacity-40 disabled:cursor-not-allowed hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors">
+          <span id="lang-label">plaintext</span>
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="lang-menu"
+          class="hidden absolute right-0 top-full mt-1 w-40 z-30 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl py-1 overflow-hidden">
+        </div>
+      </div>
+
+      <!-- Status indicator -->
+      <div id="save-status" class="hidden flex-shrink-0 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+        <span id="status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span id="status-text">Salvo</span>
+      </div>
+
+      <!-- Save button -->
+      <button id="btn-save" onclick="manualSave()" disabled data-tip="Salvar nova versão"
+        class="tip-bottom flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+        </svg>
+        Salvar versão
+      </button>
+    </div>
+
+    <!-- Read-only banner -->
+    <div id="readonly-banner" class="hidden flex-shrink-0 flex items-center justify-between px-5 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700/40">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+        </svg>
+        <span class="text-sm text-amber-700 dark:text-amber-300">Modo somente leitura — visualizando versão antiga</span>
+      </div>
+      <button onclick="goToLatest()" class="text-xs text-amber-600 dark:text-amber-400 hover:underline">Ir para versão atual</button>
+    </div>
+
+    <!-- Editor area -->
+    <div id="editor-wrap" class="flex-1 overflow-hidden relative">
+      <!-- Empty state -->
+      <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center gap-5 z-10 bg-zinc-50 dark:bg-zinc-900">
+        <div class="w-20 h-20 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+          <svg class="w-10 h-10 text-zinc-300 dark:text-zinc-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+          </svg>
+        </div>
+        <div class="text-center space-y-1">
+          <p class="text-lg font-semibold text-zinc-400 dark:text-zinc-500">Nenhum documento selecionado</p>
+          <p class="text-sm text-zinc-400 dark:text-zinc-600">Crie um snippet ou selecione um da lista</p>
+        </div>
+        <button onclick="showNewDocModal()"
+          class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+          </svg>
+          Crie seu primeiro snippet
+        </button>
+      </div>
+      <!-- CodeMirror host -->
+      <div id="cm-host" class="absolute inset-0">
+        <textarea id="cm-textarea"></textarea>
+      </div>
+    </div>
+  </main>
+
+  <!-- ─── VERSIONS PANEL ───────────────────────────────────── -->
+  <aside id="ver-panel"
+    class="w-60 flex-shrink-0 flex flex-col bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 transition-all duration-300">
+
+    <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-zinc-400 dark:text-zinc-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="text-sm font-medium text-zinc-700 dark:text-zinc-300">Histórico</span>
+        <span id="ver-count" class="hidden px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 text-xs">0</span>
+      </div>
+      <button onclick="togglePanel()" data-tip="Recolher painel"
+        class="tip-bottom p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors">
+        <svg id="panel-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+
+    <div id="ver-list" class="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+      <p id="ver-empty" class="text-center text-zinc-400 dark:text-zinc-600 text-xs py-10 px-3">Selecione um documento para ver o histórico</p>
+    </div>
+  </aside>
+</div>
+
+<!-- Panel collapsed button -->
+<button id="panel-expand-btn" onclick="togglePanel()"
+  class="tip-left hidden fixed right-0 top-1/2 -translate-y-1/2 z-20 bg-indigo-600 hover:bg-indigo-500 border-l-0 rounded-l-xl p-2.5 text-white shadow-lg transition-colors"
+  data-tip="Histórico de versões">
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+  </svg>
+</button>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════════════════════ -->
+
+<!-- Backdrop -->
+<div id="backdrop" onclick="closeModal()"
+  class="hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"></div>
+
+<!-- New document modal -->
+<div id="modal-new" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl" onclick="event.stopPropagation()">
+    <div class="px-6 py-5">
+      <h2 class="text-lg font-bold text-zinc-900 dark:text-white mb-5">Novo documento</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-zinc-600 dark:text-zinc-400 mb-1.5">Título</label>
+          <input id="new-title" type="text" placeholder="ex: auth.js"
+            onkeydown="if(event.key==='Enter') submitNewDoc()"
+            class="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-600 dark:text-zinc-400 mb-1.5">Linguagem</label>
+          <select id="new-lang"
+            class="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm">
+            <option value="plaintext">Plaintext</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="python">Python</option>
+            <option value="html">HTML</option>
+            <option value="css">CSS</option>
+            <option value="sql">SQL</option>
+            <option value="bash">Bash</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button onclick="closeModal()"
+          class="flex-1 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium transition-colors">Cancelar</button>
+        <button id="btn-create" onclick="submitNewDoc()"
+          class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2">
+          <svg id="spin-create" class="w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Criar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Rename modal -->
+<div id="modal-rename" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl" onclick="event.stopPropagation()">
+    <div class="px-6 py-5">
+      <h2 class="text-lg font-bold text-zinc-900 dark:text-white mb-4">Renomear documento</h2>
+      <input id="rename-input" type="text"
+        onkeydown="if(event.key==='Enter') submitRename()"
+        class="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm" />
+      <div class="flex gap-3 mt-4">
+        <button onclick="closeModal()"
+          class="flex-1 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium transition-colors">Cancelar</button>
+        <button onclick="submitRename()"
+          class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete modal -->
+<div id="modal-delete" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl" onclick="event.stopPropagation()">
+    <div class="px-6 py-5">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-base font-bold text-zinc-900 dark:text-white">Deletar documento</h2>
+          <p class="text-xs text-zinc-500">Esta ação não pode ser desfeita.</p>
+        </div>
+      </div>
+      <p class="text-sm text-zinc-600 dark:text-zinc-400 mb-5">
+        Deletar <span id="del-name" class="font-semibold text-zinc-900 dark:text-white"></span> e todas as suas versões?
+      </p>
+      <div class="flex gap-3">
+        <button onclick="closeModal()"
+          class="flex-1 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium transition-colors">Cancelar</button>
+        <button id="btn-del-confirm" onclick="submitDelete()"
+          class="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2">
+          <svg id="spin-del" class="w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Deletar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Restore modal -->
+<div id="modal-restore" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl" onclick="event.stopPropagation()">
+    <div class="px-6 py-5">
+      <h2 class="text-base font-bold text-zinc-900 dark:text-white mb-2">Restaurar versão</h2>
+      <p id="restore-msg" class="text-sm text-zinc-600 dark:text-zinc-400 mb-5"></p>
+      <div class="flex gap-3">
+        <button onclick="closeModal()"
+          class="flex-1 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium transition-colors">Cancelar</button>
+        <button id="btn-restore-confirm" onclick="submitRestore()"
+          class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2">
+          <svg id="spin-restore" class="w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          Restaurar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Context menu ── -->
+<div id="ctx-menu"
+  class="hidden fixed z-50 w-40 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl py-1 overflow-hidden">
+  <button id="ctx-rename"
+    class="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+    </svg>
+    Renomear
+  </button>
+  <button id="ctx-delete"
+    class="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+    </svg>
+    Deletar
+  </button>
+</div>
+
+<!-- ─── Toasts ── -->
+<div id="toast-host" class="fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2 pointer-events-none"></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════ -->
+<script>
+// ── State ────────────────────────────────────────────────────
+const S = {
+  docs: [],
+  docId: null,
+  versions: [],
+  latestVerId: null,
+  viewingVerId: null,
+  unsaved: false,
+  panelOpen: true,
+  autoTimer: null,
+  searchTimer: null,
+  ctxDocId: null,
+  renameId: null,
+  deleteId: null,
+  restoreVerId: null,
+};
+let CM = null; // CodeMirror instance
+
+// ── Language definitions ─────────────────────────────────────
+const LANGS = [
+  { id: 'plaintext',  label: 'Plaintext',  mode: null },
+  { id: 'javascript', label: 'JavaScript', mode: 'javascript' },
+  { id: 'typescript', label: 'TypeScript', mode: { name: 'javascript', typescript: true } },
+  { id: 'python',     label: 'Python',     mode: 'python' },
+  { id: 'html',       label: 'HTML',       mode: 'htmlmixed' },
+  { id: 'css',        label: 'CSS',        mode: 'css' },
+  { id: 'sql',        label: 'SQL',        mode: 'sql' },
+  { id: 'bash',       label: 'Bash',       mode: 'shell' },
+  { id: 'json',       label: 'JSON',       mode: { name: 'javascript', json: true } },
+];
+
+// ── Init ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initDarkMode();
+  initCM();
+  buildLangMenu();
+  loadDocs();
+});
+
+// ── CodeMirror ───────────────────────────────────────────────
+function initCM() {
+  CM = CodeMirror.fromTextArea(document.getElementById('cm-textarea'), {
+    theme: document.documentElement.classList.contains('dark') ? 'dracula' : 'default',
+    lineNumbers: true,
+    lineWrapping: true,
+    tabSize: 2,
+    indentWithTabs: false,
+    extraKeys: { Tab: 'indentMore', 'Shift-Tab': 'indentLess' },
+  });
+  CM.setSize('100%', '100%');
+
+  CM.on('change', () => {
+    if (!S.docId || S.viewingVerId !== null) return;
+    if (!S.unsaved) {
+      S.unsaved = true;
+      setStatus('unsaved');
+    }
+    clearTimeout(S.autoTimer);
+    S.autoTimer = setTimeout(autoSave, 2000);
+  });
+}
+
+function setCMMode(lang) {
+  const def = LANGS.find(l => l.id === lang) || LANGS[0];
+  CM.setOption('mode', def.mode);
+}
+
+function setCMReadOnly(ro) {
+  CM.setOption('readOnly', ro ? 'nocursor' : false);
+}
+
+// ── API helpers ──────────────────────────────────────────────
+async function api(url, opts = {}) {
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (res.status === 401) { window.location.href = '/login'; throw new Error('Sessão expirada'); }
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || 'Erro');
+  return body;
+}
+
+// ── Load documents ───────────────────────────────────────────
+async function loadDocs() {
+  try {
+    S.docs = await api('/api/documents');
+    renderDocList(S.docs);
+  } catch {
+    toast('Erro ao carregar documentos', 'error');
+  } finally {
+    document.getElementById('doc-skeleton').classList.add('hidden');
+    document.getElementById('doc-list').classList.remove('hidden');
+  }
+}
+
+function filterDocs(q) {
+  if (!q) return S.docs;
+  const lq = q.toLowerCase();
+  return S.docs.filter(d => d.title.toLowerCase().includes(lq));
+}
+
+function renderDocList(docs) {
+  const list = document.getElementById('doc-list');
+  const empty = document.getElementById('doc-empty');
+  const q = document.getElementById('search-input').value;
+
+  if (!docs.length) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  list.innerHTML = docs.map(d => {
+    const active = d.id === S.docId;
+    const title = q
+      ? esc(d.title).replace(new RegExp(escRx(q), 'gi'), m => `<mark class="bg-indigo-400/30 text-indigo-800 dark:text-indigo-200 rounded px-0.5">${m}</mark>`)
+      : esc(d.title);
+    return `
+      <div id="di-${d.id}" onclick="openDoc(${d.id})"
+        class="group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${active ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'}">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate leading-snug">${title}</p>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500">${esc(d.language || 'plaintext')}</span>
+            <span class="text-[10px] text-zinc-400 dark:text-zinc-600">${relTime(d.updated_at)}</span>
+          </div>
+        </div>
+        <button onclick="openCtxMenu(event,${d.id})"
+          class="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 dark:text-zinc-500 flex-shrink-0 transition-all">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <circle cx="10" cy="4"  r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="16" r="1.5"/>
+          </svg>
+        </button>
+      </div>`;
+  }).join('');
+}
+
+// ── Open document ────────────────────────────────────────────
+async function openDoc(id) {
+  if (S.unsaved && S.docId && S.docId !== id) await autoSave();
+  S.docId = id;
+  S.viewingVerId = null;
+
+  renderDocList(filterDocs(document.getElementById('search-input').value));
+  document.getElementById('empty-state').classList.add('hidden');
+
+  try {
+    const doc = await api(`/api/documents/${id}`);
+    const cv = doc.current_version;
+
+    // Title
+    const titleEl = document.getElementById('doc-title');
+    titleEl.textContent = doc.title;
+    titleEl.setAttribute('contenteditable', 'true');
+    titleEl.className = titleEl.className.replace('text-zinc-500 dark:text-zinc-500', 'text-zinc-900 dark:text-zinc-100');
+
+    // Lang badge
+    document.getElementById('lang-label').textContent = doc.language || 'plaintext';
+    document.getElementById('lang-btn').disabled = false;
+
+    // Editor: prefer draft over last saved version
+    const content = doc.draft_content != null ? doc.draft_content : (cv ? cv.content : '');
+    CM.setValue(content);
+    setCMMode(doc.language || 'plaintext');
+    setCMReadOnly(false);
+    document.getElementById('save-status').classList.remove('hidden');
+    document.getElementById('readonly-banner').classList.add('hidden');
+
+    S.latestVerId = cv ? cv.id : null;
+    S.unsaved = false;
+    setStatus(doc.draft_content != null ? 'draft' : 'saved');
+
+    await loadVersions(id);
+    setTimeout(() => CM.focus(), 80);
+  } catch {
+    toast('Erro ao abrir documento', 'error');
+  }
+}
+
+// ── New document ─────────────────────────────────────────────
+function showNewDocModal() {
+  document.getElementById('new-title').value = '';
+  document.getElementById('new-lang').value = 'plaintext';
+  openModal('modal-new');
+  setTimeout(() => document.getElementById('new-title').focus(), 100);
+}
+
+async function submitNewDoc() {
+  const title = document.getElementById('new-title').value.trim();
+  const lang  = document.getElementById('new-lang').value;
+  if (!title) { document.getElementById('new-title').focus(); return; }
+
+  withSpin('btn-create', 'spin-create', async () => {
+    const doc = await api('/api/documents', { method: 'POST', body: JSON.stringify({ title, language: lang, content: '' }) });
+    S.docs.unshift(doc);
+    closeModal();
+    toast(`"${doc.title}" criado!`, 'success');
+    openDoc(doc.id);
+  });
+}
+
+// ── Versions ─────────────────────────────────────────────────
+async function loadVersions(docId) {
+  S.versions = await api(`/api/documents/${docId}/versions`);
+  renderVersions();
+}
+
+function renderVersions() {
+  const list = document.getElementById('ver-list');
+  const cnt = document.getElementById('ver-count');
+
+  cnt.textContent = S.versions.length;
+  cnt.classList.toggle('hidden', S.versions.length === 0);
+
+  if (!S.versions.length) {
+    list.innerHTML = '<p class="text-center text-zinc-400 dark:text-zinc-600 text-xs py-10 px-3">Nenhuma versão ainda</p>';
+    return;
+  }
+
+  list.innerHTML = S.versions.map((v, i) => {
+    const isCurrent = v.id === S.latestVerId && S.viewingVerId === null;
+    const isViewing = v.id === S.viewingVerId;
+    return `
+      <div onclick="viewVersion(${v.document_id},${v.id},${v.version_number})"
+        class="group flex flex-col gap-0.5 px-3 py-2.5 rounded-xl cursor-pointer transition-colors v-enter ${isViewing ? 'bg-indigo-50 dark:bg-indigo-950/40' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/60'}"
+        style="animation-delay:${i * 25}ms">
+        <div class="flex items-center justify-between gap-1.5">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-mono font-bold text-zinc-500 dark:text-zinc-400">v${v.version_number}</span>
+            ${isCurrent ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full border bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400">atual</span>' : ''}
+          </div>
+          ${!isCurrent ? `
+            <button onclick="event.stopPropagation(); showRestoreModal(${v.document_id},${v.id},${v.version_number})"
+              class="opacity-0 group-hover:opacity-100 text-[10px] px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-900/40 hover:bg-indigo-600 text-indigo-600 dark:text-indigo-400 hover:text-white transition-all">
+              Restaurar
+            </button>` : ''}
+        </div>
+        ${v.label ? `<p class="text-[11px] text-zinc-500 dark:text-zinc-500 truncate">${esc(v.label)}</p>` : ''}
+        <p class="text-[10px] text-zinc-400 dark:text-zinc-600">${relTime(v.created_at)}</p>
+      </div>`;
+  }).join('');
+}
+
+async function viewVersion(docId, verId, verNum) {
+  if (S.unsaved) await autoSave();
+  try {
+    if (verId === S.latestVerId) {
+      // Clicking the latest version restores working state (draft > version)
+      await goToLatest();
+      return;
+    }
+    const v = await api(`/api/documents/${docId}/versions/${verId}`);
+    S.viewingVerId = verId;
+    CM.setValue(v.content || '');
+    setCMReadOnly(true);
+    document.getElementById('readonly-banner').classList.remove('hidden');
+    renderVersions();
+  } catch {
+    toast('Erro ao carregar versão', 'error');
+  }
+}
+
+async function goToLatest() {
+  try {
+    const doc = await api(`/api/documents/${S.docId}`);
+    const cv = doc.current_version;
+    const content = doc.draft_content != null ? doc.draft_content : (cv ? cv.content : '');
+    CM.setValue(content);
+    S.latestVerId = cv ? cv.id : null;
+    S.viewingVerId = null;
+    setCMReadOnly(false);
+    document.getElementById('readonly-banner').classList.add('hidden');
+    S.unsaved = false;
+    setStatus(doc.draft_content != null ? 'draft' : 'saved');
+    renderVersions();
+  } catch {
+    toast('Erro ao carregar versão atual', 'error');
+  }
+}
+
+// ── Restore ──────────────────────────────────────────────────
+function showRestoreModal(docId, verId, verNum) {
+  S.restoreVerId = verId;
+  const next = S.versions.length ? S.versions[0].version_number + 1 : '?';
+  document.getElementById('restore-msg').textContent =
+    `Deseja restaurar a versão v${verNum}? O conteúdo atual será preservado como v${next}.`;
+  openModal('modal-restore');
+}
+
+async function submitRestore() {
+  withSpin('btn-restore-confirm', 'spin-restore', async () => {
+    const nv = await api(`/api/documents/${S.docId}/restore/${S.restoreVerId}`, { method: 'POST' });
+    S.versions = await api(`/api/documents/${S.docId}/versions`);
+    S.latestVerId = nv.id;
+    S.viewingVerId = null;
+    CM.setValue(nv.content || '');
+    setCMReadOnly(false);
+    document.getElementById('readonly-banner').classList.add('hidden');
+    S.unsaved = false;
+    setStatus('saved');
+    renderVersions();
+    closeModal();
+    toast(`Versão v${nv.version_number} restaurada!`, 'success');
+    refreshDocInList(S.docId);
+  });
+}
+
+// ── Save ─────────────────────────────────────────────────────
+async function autoSave() {
+  if (!S.docId || !S.unsaved || S.viewingVerId !== null) return;
+  try {
+    await api(`/api/documents/${S.docId}/draft`, {
+      method: 'PUT', body: JSON.stringify({ content: CM.getValue() })
+    });
+    S.unsaved = false;
+    setStatus('draft');
+  } catch {
+    // silently retry on next change
+  }
+}
+
+async function manualSave() {
+  if (!S.docId || S.viewingVerId !== null) return;
+  clearTimeout(S.autoTimer);
+  document.getElementById('btn-save').disabled = true;
+  try {
+    await saveVersion();
+    toast('Versão salva!', 'success');
+  } catch {
+    toast('Erro ao salvar', 'error');
+    document.getElementById('btn-save').disabled = false;
+  }
+}
+
+async function saveVersion() {
+  const content = CM.getValue();
+  const nv = await api(`/api/documents/${S.docId}/versions`, {
+    method: 'POST', body: JSON.stringify({ content })
+  });
+  S.latestVerId = nv.id;
+  S.unsaved = false;
+  setStatus('saved');
+  S.versions = await api(`/api/documents/${S.docId}/versions`);
+  renderVersions();
+  refreshDocInList(S.docId);
+}
+
+// state: 'saved' | 'draft' | 'unsaved'
+function setStatus(state) {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  const btn  = document.getElementById('btn-save');
+  if (state === 'saved') {
+    dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+    text.textContent = 'Salvo';
+    btn.disabled = true;
+  } else if (state === 'draft') {
+    dot.className = 'w-2 h-2 rounded-full bg-sky-400';
+    text.textContent = 'Rascunho';
+    btn.disabled = false;
+  } else {
+    dot.className = 'w-2 h-2 rounded-full bg-amber-400 pulse';
+    text.textContent = 'Não salvo';
+    btn.disabled = false;
+  }
+}
+
+// ── Title editing ─────────────────────────────────────────────
+let _prevTitle = '';
+function enableTitleEdit() {
+  if (!S.docId) return;
+  _prevTitle = document.getElementById('doc-title').textContent.trim();
+}
+function onTitleKeydown(e) {
+  if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  if (e.key === 'Escape') { e.target.textContent = _prevTitle; e.target.blur(); }
+}
+async function onTitleBlur() {
+  if (!S.docId) return;
+  const el = document.getElementById('doc-title');
+  const nv = el.textContent.trim() || _prevTitle;
+  el.textContent = nv;
+  if (nv === _prevTitle) return;
+  try {
+    await api(`/api/documents/${S.docId}`, { method: 'PUT', body: JSON.stringify({ title: nv }) });
+    const d = S.docs.find(d => d.id === S.docId);
+    if (d) d.title = nv;
+    renderDocList(filterDocs(document.getElementById('search-input').value));
+    _prevTitle = nv;
+    toast('Título atualizado', 'success');
+  } catch {
+    el.textContent = _prevTitle;
+    toast('Erro ao atualizar título', 'error');
+  }
+}
+
+// ── Language menu ─────────────────────────────────────────────
+function buildLangMenu() {
+  const menu = document.getElementById('lang-menu');
+  menu.innerHTML = LANGS.map(l => `
+    <button onclick="selectLang('${l.id}')"
+      class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
+      <span class="font-mono text-[11px] text-zinc-400 w-20 text-left">${l.id}</span>
+      ${l.label}
+    </button>`).join('');
+}
+
+function toggleLangMenu() {
+  document.getElementById('lang-menu').classList.toggle('hidden');
+}
+
+async function selectLang(lang) {
+  document.getElementById('lang-menu').classList.add('hidden');
+  if (!S.docId) return;
+  document.getElementById('lang-label').textContent = lang;
+  setCMMode(lang);
+  try {
+    await api(`/api/documents/${S.docId}`, { method: 'PUT', body: JSON.stringify({ language: lang }) });
+    const d = S.docs.find(d => d.id === S.docId);
+    if (d) d.language = lang;
+    renderDocList(filterDocs(document.getElementById('search-input').value));
+  } catch {
+    toast('Erro ao mudar linguagem', 'error');
+  }
+}
+
+// ── Context menu ──────────────────────────────────────────────
+function openCtxMenu(e, docId) {
+  e.stopPropagation();
+  S.ctxDocId = docId;
+  const menu = document.getElementById('ctx-menu');
+  menu.classList.remove('hidden');
+  const x = Math.min(e.clientX, window.innerWidth - 160);
+  const y = Math.min(e.clientY, window.innerHeight - 90);
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+
+  document.getElementById('ctx-rename').onclick = () => { menu.classList.add('hidden'); showRenameModal(S.ctxDocId); };
+  document.getElementById('ctx-delete').onclick = () => { menu.classList.add('hidden'); showDeleteModal(S.ctxDocId); };
+}
+
+// ── Rename ────────────────────────────────────────────────────
+function showRenameModal(id) {
+  S.renameId = id;
+  const d = S.docs.find(d => d.id === id);
+  document.getElementById('rename-input').value = d?.title || '';
+  openModal('modal-rename');
+  setTimeout(() => { const inp = document.getElementById('rename-input'); inp.focus(); inp.select(); }, 100);
+}
+
+async function submitRename() {
+  const nv = document.getElementById('rename-input').value.trim();
+  if (!nv) return;
+  try {
+    await api(`/api/documents/${S.renameId}`, { method: 'PUT', body: JSON.stringify({ title: nv }) });
+    const d = S.docs.find(d => d.id === S.renameId);
+    if (d) d.title = nv;
+    if (S.docId === S.renameId) {
+      const el = document.getElementById('doc-title');
+      el.textContent = nv;
+      _prevTitle = nv;
+    }
+    renderDocList(filterDocs(document.getElementById('search-input').value));
+    closeModal();
+    toast('Documento renomeado', 'success');
+  } catch {
+    toast('Erro ao renomear', 'error');
+  }
+}
+
+// ── Delete ────────────────────────────────────────────────────
+function showDeleteModal(id) {
+  S.deleteId = id;
+  const d = S.docs.find(d => d.id === id);
+  document.getElementById('del-name').textContent = d?.title || 'este documento';
+  openModal('modal-delete');
+}
+
+async function submitDelete() {
+  withSpin('btn-del-confirm', 'spin-del', async () => {
+    await api(`/api/documents/${S.deleteId}`, { method: 'DELETE' });
+    S.docs = S.docs.filter(d => d.id !== S.deleteId);
+    if (S.docId === S.deleteId) resetEditor();
+    renderDocList(filterDocs(document.getElementById('search-input').value));
+    closeModal();
+    toast('Documento deletado', 'success');
+  });
+}
+
+function resetEditor() {
+  S.docId = null; S.versions = []; S.latestVerId = null; S.viewingVerId = null; S.unsaved = false;
+  CM.setValue(''); setCMReadOnly(false);
+  const titleEl = document.getElementById('doc-title');
+  titleEl.textContent = 'Selecione um documento';
+  titleEl.setAttribute('contenteditable', 'false');
+  titleEl.className = titleEl.className.replace('text-zinc-900 dark:text-zinc-100', 'text-zinc-500 dark:text-zinc-500');
+  document.getElementById('lang-btn').disabled = true;
+  document.getElementById('btn-save').disabled = true;
+  document.getElementById('save-status').classList.add('hidden');
+  document.getElementById('readonly-banner').classList.add('hidden');
+  document.getElementById('empty-state').classList.remove('hidden');
+  document.getElementById('ver-list').innerHTML = '<p class="text-center text-zinc-400 dark:text-zinc-600 text-xs py-10 px-3">Selecione um documento para ver o histórico</p>';
+  document.getElementById('ver-count').classList.add('hidden');
+}
+
+// ── Search ────────────────────────────────────────────────────
+function handleSearch(q) {
+  clearTimeout(S.searchTimer);
+  S.searchTimer = setTimeout(() => renderDocList(filterDocs(q)), 300);
+}
+
+// ── Panel toggle ──────────────────────────────────────────────
+function togglePanel() {
+  S.panelOpen = !S.panelOpen;
+  document.getElementById('ver-panel').classList.toggle('hidden', !S.panelOpen);
+  document.getElementById('panel-expand-btn').classList.toggle('hidden', S.panelOpen);
+}
+
+// ── Modals ────────────────────────────────────────────────────
+function openModal(id) {
+  document.getElementById('backdrop').classList.remove('hidden');
+  document.getElementById(id).classList.remove('hidden');
+}
+function closeModal() {
+  document.getElementById('backdrop').classList.add('hidden');
+  ['modal-new','modal-rename','modal-delete','modal-restore'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+}
+
+// ── Dark mode ─────────────────────────────────────────────────
+function initDarkMode() {
+  const stored = localStorage.getItem('cv-dark');
+  const sys    = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark   = stored !== null ? stored === '1' : sys;
+  applyDark(dark);
+}
+
+function toggleDarkMode() {
+  const dark = !document.documentElement.classList.contains('dark');
+  applyDark(dark);
+  localStorage.setItem('cv-dark', dark ? '1' : '0');
+}
+
+function applyDark(dark) {
+  document.documentElement.classList.toggle('dark', dark);
+  document.getElementById('icon-sun').classList.toggle('hidden', !dark);
+  document.getElementById('icon-moon').classList.toggle('hidden', dark);
+  if (CM) CM.setOption('theme', dark ? 'dracula' : 'default');
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3000) {
+  const host = document.getElementById('toast-host');
+  const cfg = {
+    success: { bg: 'bg-emerald-900/90 dark:bg-emerald-900/90 border-emerald-700',    text: 'text-emerald-100', icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>' },
+    error:   { bg: 'bg-red-900/90 border-red-700',     text: 'text-red-100',     icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>' },
+    info:    { bg: 'bg-zinc-800/95 border-zinc-700',   text: 'text-zinc-100',    icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>' },
+  }[type];
+
+  const el = document.createElement('div');
+  el.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl ${cfg.bg} ${cfg.text} toast-in`;
+  el.style.minWidth = '240px';
+  el.innerHTML = `<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">${cfg.icon}</svg><span class="text-sm">${esc(msg)}</span>`;
+  host.prepend(el);
+  setTimeout(() => { el.classList.replace('toast-in','toast-out'); setTimeout(() => el.remove(), 300); }, duration);
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escRx(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function relTime(raw) {
+  if (!raw) return '';
+  const d = new Date(raw.includes('T') ? raw : raw.replace(' ','T') + 'Z');
+  const s = Math.floor((Date.now() - d) / 1000);
+  if (s < 60)     return 'agora';
+  if (s < 3600)   return `há ${Math.floor(s/60)}min`;
+  if (s < 86400)  return `há ${Math.floor(s/3600)}h`;
+  if (s < 604800) return `há ${Math.floor(s/86400)}d`;
+  return d.toLocaleDateString('pt-BR');
+}
+
+function refreshDocInList(id) {
+  const d = S.docs.find(d => d.id === id);
+  if (d) d.updated_at = new Date().toISOString();
+  renderDocList(filterDocs(document.getElementById('search-input').value));
+}
+
+async function withSpin(btnId, spinId, fn) {
+  const btn  = document.getElementById(btnId);
+  const spin = document.getElementById(spinId);
+  btn.disabled = true;
+  spin.classList.remove('hidden');
+  try { await fn(); } catch (e) { toast(e.message || 'Erro', 'error'); }
+  finally { btn.disabled = false; spin.classList.add('hidden'); }
+}
+
+// ── Global event listeners ────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    document.getElementById('ctx-menu').classList.add('hidden');
+    document.getElementById('lang-menu').classList.add('hidden');
+  }
+});
+
+document.addEventListener('click', e => {
+  if (!document.getElementById('lang-wrap').contains(e.target))
+    document.getElementById('lang-menu').classList.add('hidden');
+  if (!document.getElementById('ctx-menu').contains(e.target))
+    document.getElementById('ctx-menu').classList.add('hidden');
+});
+
+window.addEventListener('beforeunload', e => {
+  if (S.unsaved) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// Refresh relative times every minute
+setInterval(() => {
+  if (S.docs.length)    renderDocList(filterDocs(document.getElementById('search-input').value));
+  if (S.versions.length) renderVersions();
+}, 60_000);
+</script>
+</body>
+</html>

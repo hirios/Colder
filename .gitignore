@@ -1,0 +1,32 @@
+# Ambiente virtual
+venv/
+
+# Claude
+.claude/
+
+# Banco de dados
+*.db
+*.db-shm
+*.db-wal
+
+# Segredos gerados pelo instalador (SECRET_KEY)
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini

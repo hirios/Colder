@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colder — Login</title>
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = { darkMode: 'class' };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .fade-up { animation: fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) both; }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%,60% { transform: translateX(-6px); }
+      40%,80% { transform: translateX(6px); }
+    }
+    .shake { animation: shake 0.4s ease-in-out; }
+  </style>
+</head>
+<body class="bg-zinc-950 min-h-screen flex items-center justify-center p-4">
+
+  <div class="w-full max-w-sm fade-up">
+
+    <!-- Logo -->
+    <div class="flex flex-col items-center mb-8">
+      <div class="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-indigo-900/50">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-white tracking-tight">Colder</h1>
+      <p class="text-zinc-500 text-sm mt-1">Entre para acessar seus snippets</p>
+    </div>
+
+    <!-- Card -->
+    <div id="card" class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl">
+
+      <!-- Error alert -->
+      <div id="error-box" class="hidden mb-5 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-red-950/60 border border-red-800/60 text-red-400 text-sm">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+        </svg>
+        <span id="error-text"></span>
+      </div>
+
+      <div class="space-y-4">
+
+        <!-- Username -->
+        <div>
+          <label for="username" class="block text-sm font-medium text-zinc-400 mb-1.5">Usuário</label>
+          <input id="username" type="text" autocomplete="username" spellcheck="false"
+            placeholder="seu usuário"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all text-sm" />
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label for="password" class="block text-sm font-medium text-zinc-400 mb-1.5">Senha</label>
+          <div class="relative">
+            <input id="password" type="password" autocomplete="current-password"
+              placeholder="••••••••"
+              class="w-full px-3.5 py-2.5 pr-11 rounded-xl bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition-all text-sm" />
+            <button type="button" id="toggle-pwd" onclick="togglePwd()"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors p-0.5">
+              <!-- Eye open -->
+              <svg id="eye-on" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+              <!-- Eye slash -->
+              <svg id="eye-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button id="btn-login" onclick="submitLogin()"
+        class="mt-6 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 select-none">
+        <svg id="spin" class="w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        Entrar
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    document.getElementById('username').focus();
+
+    ['username', 'password'].forEach(id =>
+      document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') submitLogin();
+      })
+    );
+
+    function togglePwd() {
+      const inp = document.getElementById('password');
+      const isText = inp.type === 'text';
+      inp.type = isText ? 'password' : 'text';
+      document.getElementById('eye-on').classList.toggle('hidden', !isText);
+      document.getElementById('eye-off').classList.toggle('hidden', isText);
+    }
+
+    async function submitLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!username || !password) {
+        showError('Preencha usuário e senha.');
+        return;
+      }
+
+      const btn  = document.getElementById('btn-login');
+      const spin = document.getElementById('spin');
+      btn.disabled = true;
+      spin.classList.remove('hidden');
+      hideError();
+
+      try {
+        const res  = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          showError(data.error || 'Credenciais inválidas');
+          document.getElementById('password').value = '';
+          document.getElementById('password').focus();
+        }
+      } catch {
+        showError('Erro de conexão. Tente novamente.');
+      } finally {
+        btn.disabled = false;
+        spin.classList.add('hidden');
+      }
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('error-box');
+      document.getElementById('error-text').textContent = msg;
+      box.classList.remove('hidden');
+      // Remove and re-add shake class to replay animation
+      const card = document.getElementById('card');
+      card.classList.remove('shake');
+      void card.offsetWidth;
+      card.classList.add('shake');
+    }
+
+    function hideError() {
+      document.getElementById('error-box').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
